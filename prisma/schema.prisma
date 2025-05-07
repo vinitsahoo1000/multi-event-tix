@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  createdAt     DateTime  @default(now())
+  profilePhoto  String?
+  role          Role      @default(User)
+  tickets       Ticket[]
+  Events        Event[]
+}
+
+model Event {
+  id        String @id @default(uuid())
+  EventName String
+  Date      String
+  Time      String
+  description String
+  imageUrl    String?
+  createdAt DateTime @default(now())
+  location  String
+  adminId   String
+  admin     User @relation(fields: [adminId], references: [id])
+  Tickets   Ticket[]
+  TicketTypes TicketType[]
+}
+
+model Ticket {
+  id          String    @id     @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId],references: [id])
+  userId      String?
+  user        User?     @relation(fields: [userId],references: [id])
+  ticketTypeId  String
+  ticketType   TicketType  @relation(fields: [ticketTypeId], references: [id])
+  createdAt   DateTime  @default(now())
+}
+
+model TicketType {
+  id        String   @id @default(cuid())
+  name      String
+  price     Int
+  quantity  Int
+  eventId   String
+  event     Event @relation(fields: [eventId], references: [id])
+  tickets  Ticket[]
+}
+
+
+enum Role {
+  User
+  Admin
+}
