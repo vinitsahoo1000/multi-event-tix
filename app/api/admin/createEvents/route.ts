@@ -4,15 +4,26 @@ import { EventSchema } from "@/schema";
 import { headers } from 'next/headers';
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
+import { cloudinary } from "@/utils/cloudinary";
+import streamifier from 'streamifier';
+import { UploadApiResponse } from "cloudinary";
 
 
-export async function POST(req:NextRequest,res:NextResponse){
+export async function POST(req:NextRequest){
     try{
         const session = await getServerSession({ req: { headers: headers() }, ...authOptions });
 
-        console.log("session: ",session)
-        const json = await req.json();
-        const EventPayload = EventSchema.parse(json);
+        const formData = await req.formData();
+        const file = formData.get("coverImage") as File;
+        
+        const formFields: Record<string, any> = {};
+        formData.forEach((value, key) => {
+        if (typeof value === 'string') {
+            formFields[key] = value;
+        }
+        });
+
+        const EventPayload = EventSchema.parse(formFields);
 
         if(!session){
             return NextResponse.json({
@@ -38,6 +49,21 @@ export async function POST(req:NextRequest,res:NextResponse){
             })
         }
 
+        let upload: UploadApiResponse | null = null;
+
+        if(file){
+            const buffer = Buffer.from(await file.arrayBuffer());
+
+            upload = await new Promise((resolve,reject)=>{
+                const uploadStream = cloudinary.uploader.upload_stream((error,result)=>{
+                    if(error) return reject(error);
+                    resolve(result ?? null);
+                });
+
+                streamifier.createReadStream(buffer).pipe(uploadStream);
+            });
+        }
+
         const NewEvent = await prisma.event.create({
             data:{
                 EventName: EventPayload.EventName,
@@ -45,6 +71,7 @@ export async function POST(req:NextRequest,res:NextResponse){
                 Time: EventPayload.Time,
                 description: EventPayload.description ,
                 location: EventPayload.location,
+                imageUrl: upload?.secure_url || null,
                 adminId: Admin.id
             }
         })
